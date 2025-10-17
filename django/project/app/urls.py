@@ -12,5 +12,5 @@ urlpatterns = [
     path('api/refresh_products/', refresh_products),
     path('api/valider_commande/<int:commande_id>/', ValiderCommandeView.as_view(), name='valider_commande'),
     path('', index, name='index'),    # Frontend (pattern catch-all à la fin)
-    
+    re_path(r'^(?!api/).*$', index, name='react_catchall'),
 ]

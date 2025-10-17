@@ -1,0 +1,22 @@
+# Node (React)
+react/node_modules/
+react/dist/
+react/build/
+
+
+# Python (Django)
+django/gesta_test/__pycache__/
+django/gesta_test/app/__pycache__/
+django/gesta_test/media/
+django/gesta_test/db.sqlite3
+venv/
+*.pyc
+__pycache__/
+
+
+
+
+# OS / IDE
+.DS_Store
+*.log
+.vscode/

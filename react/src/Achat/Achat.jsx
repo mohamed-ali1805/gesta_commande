@@ -5,66 +5,63 @@ import { useNavigate } from "react-router-dom";
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ClearAllIcon from '@mui/icons-material/ClearAll';
-import logo from "../assets/logo.png";
 import DoneAllIcon from '@mui/icons-material/DoneAll';
 import EditIcon from '@mui/icons-material/Edit';
+import logo from "../assets/logo.png";
 import StoreIcon from '@mui/icons-material/Store';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import TransferWithinAStationIcon from '@mui/icons-material/TransferWithinAStation';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
-
-
-export default function Commandes() {
+export default function Achats() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const [commandes, setCommandes] = useState([]);
+    const [achats, setAchats] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [validating, setValidating] = useState(new Set());
     const [deleting, setDeleting] = useState(new Set());
     const [clearingAll, setClearingAll] = useState(false);
-    const [activeTab, setActiveTab] = useState('en_attente'); // 'en_attente' ou 'validees'
+    const [activeTab, setActiveTab] = useState('en_attente');
     const navigate = useNavigate();
 
     const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-    const [expandedCommandes, setExpandedCommandes] = useState(new Set());
+    const [expandedAchats, setExpandedAchats] = useState(new Set());
 
-    const toggleArticles = (commandeId) => {
-        const newExpanded = new Set(expandedCommandes);
-        if (newExpanded.has(commandeId)) {
-            newExpanded.delete(commandeId);
+    const toggleArticles = (achatId) => {
+        const newExpanded = new Set(expandedAchats);
+        if (newExpanded.has(achatId)) {
+            newExpanded.delete(achatId);
         } else {
-            newExpanded.add(commandeId);
+            newExpanded.add(achatId);
         }
-        setExpandedCommandes(newExpanded);
+        setExpandedAchats(newExpanded);
     };
 
-    const fetchCommandes = async () => {
+    const fetchAchats = async () => {
         try {
             setLoading(true);
-            const response = await fetch(`${API_BASE_URL}/api/orders/`);
+            const response = await fetch(`${API_BASE_URL}/api/achats/`);
 
             if (!response.ok) {
                 throw new Error(`Erreur HTTP: ${response.status}`);
             }
 
             const data = await response.json();
-            setCommandes(data);
+            setAchats(data);
             setError(null);
         } catch (err) {
             setError(err.message);
-            console.error('Erreur lors du chargement des commandes:', err);
+            console.error('Erreur lors du chargement des achats:', err);
         } finally {
             setLoading(false);
         }
     };
 
-    // Fonction pour valider une commande
-    const validateCommande = async (commandeId) => {
+    const validateAchat = async (achatId) => {
         try {
-            setValidating(prev => new Set(prev).add(commandeId));
+            setValidating(prev => new Set(prev).add(achatId));
 
-            const response = await fetch(`${API_BASE_URL}/api/valider_commande/${commandeId}/`, {
+            const response = await fetch(`${API_BASE_URL}/api/valider_achat/${achatId}/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -75,33 +72,31 @@ export default function Commandes() {
                 throw new Error(`Erreur HTTP: ${response.status}`);
             }
 
-            // Mettre à jour localement
-            setCommandes(prev => prev.map(cmd =>
-                cmd.id === commandeId ? { ...cmd, status: 'Validé' } : cmd
+            setAchats(prev => prev.map(achat =>
+                achat.id === achatId ? { ...achat, status: 'Validé' } : achat
             ));
 
         } catch (err) {
             console.error('Erreur lors de la validation:', err);
-            alert('Erreur lors de la validation de la commande');
+            alert('Erreur lors de la validation de l\'achat');
         } finally {
             setValidating(prev => {
                 const newSet = new Set(prev);
-                newSet.delete(commandeId);
+                newSet.delete(achatId);
                 return newSet;
             });
         }
     };
 
-    // Fonction pour supprimer une commande
-    const deleteCommande = async (commandeId) => {
-        if (!confirm('Êtes-vous sûr de vouloir supprimer cette commande ?')) {
+    const deleteAchat = async (achatId) => {
+        if (!confirm('Êtes-vous sûr de vouloir supprimer cet achat ?')) {
             return;
         }
 
         try {
-            setDeleting(prev => new Set(prev).add(commandeId));
+            setDeleting(prev => new Set(prev).add(achatId));
 
-            const response = await fetch(`${API_BASE_URL}/api/orders/${commandeId}/`, {
+            const response = await fetch(`${API_BASE_URL}/api/achats/${achatId}/`, {
                 method: 'DELETE'
             });
 
@@ -109,55 +104,52 @@ export default function Commandes() {
                 throw new Error(`Erreur HTTP: ${response.status}`);
             }
 
-            // Supprimer localement
-            setCommandes(prev => prev.filter(cmd => cmd.id !== commandeId));
+            setAchats(prev => prev.filter(achat => achat.id !== achatId));
 
         } catch (err) {
             console.error('Erreur lors de la suppression:', err);
-            alert('Erreur lors de la suppression de la commande');
+            alert('Erreur lors de la suppression de l\'achat');
         } finally {
             setDeleting(prev => {
                 const newSet = new Set(prev);
-                newSet.delete(commandeId);
+                newSet.delete(achatId);
                 return newSet;
             });
         }
     };
 
-    const clearAllCommandes = async () => {
-        const currentCommandes = filteredCommandes;
-        const tabName = activeTab === 'en_attente' ? 'en attente' : 'validées';
+    const clearAllAchats = async () => {
+        const currentAchats = filteredAchats;
+        const tabName = activeTab === 'en_attente' ? 'en attente' : 'validés';
 
-        if (!confirm(`Êtes-vous sûr de vouloir supprimer TOUTES les commandes ${tabName} ? Cette action est irréversible.`)) {
+        if (!confirm(`Êtes-vous sûr de vouloir supprimer TOUS les achats ${tabName} ? Cette action est irréversible.`)) {
             return;
         }
 
         try {
             setClearingAll(true);
 
-            // Supprimer les commandes de l'onglet actuel une par une (séquentiellement)
-            for (const commande of currentCommandes) {
-                await fetch(`${API_BASE_URL}/api/orders/${commande.id}/`, {
+            for (const achat of currentAchats) {
+                await fetch(`${API_BASE_URL}/api/achats/${achat.id}/`, {
                     method: 'DELETE'
                 });
             }
 
-            // Mettre à jour la liste localement
-            setCommandes(prev => prev.filter(cmd =>
-                activeTab === 'en_attente' ? cmd.status === 'Validé' : cmd.status !== 'Validé'
+            setAchats(prev => prev.filter(achat =>
+                activeTab === 'en_attente' ? achat.status === 'Validé' : achat.status !== 'Validé'
             ));
 
         } catch (err) {
             console.error('Erreur lors de la suppression globale:', err);
-            alert('Erreur lors de la suppression des commandes');
-            fetchCommandes(); // Recharger en cas d'erreur
+            alert('Erreur lors de la suppression des achats');
+            fetchAchats();
         } finally {
             setClearingAll(false);
         }
     };
 
     useEffect(() => {
-        fetchCommandes();
+        fetchAchats();
     }, []);
 
     const formatDate = (dateString) => {
@@ -171,21 +163,19 @@ export default function Commandes() {
         });
     };
 
-    // Filtrer les commandes selon l'onglet actif
-    const filteredCommandes = commandes.filter(commande => {
+    const filteredAchats = achats.filter(achat => {
         if (activeTab === 'en_attente') {
-            return commande.status !== 'Validé';
+            return achat.status !== 'Validé';
         } else {
-            return commande.status === 'Validé';
+            return achat.status === 'Validé';
         }
     });
 
-    // Compter les commandes par catégorie
-    const commandesEnAttente = commandes.filter(cmd => cmd.status !== 'Validé').length;
-    const commandesValidees = commandes.filter(cmd => cmd.status === 'Validé').length;
+    const achatsEnAttente = achats.filter(achat => achat.status !== 'Validé').length;
+    const achatsValides = achats.filter(achat => achat.status === 'Validé').length;
 
     return (
-        <div className="bg-gradient-to-r from-[#081c3c] to-[#000000] text-white min-h-screen"> 
+        <div className="bg-gradient-to-r from-[#081c3c] to-[#000000] text-white min-h-screen">
             {/* NAVBAR */}
             <div className="sticky top-0 z-50 bg-gradient-to-r from-[#081c3c] to-[#000000] border-b border-white/10">
                 <div className="container mx-auto px-4 sm:px-6 py-4">
@@ -267,34 +257,33 @@ export default function Commandes() {
                 </div>
             </div>
 
-            {/* Contenu principal */}
             <div className="px-5 py-8">
                 <div className="flex-col items-center mb-8">
                     <h2 className="text-2xl font-bold text-teal-400 flex items-center gap-5 mb-4">
                         <ArrowBackIcon onClick={() => navigate("/")} className="cursor-pointer hover:text-teal-300 transition" />
-                        <p>Mes Commandes</p>
+                        <p>Mes Achats</p>
                     </h2>
                     <div className='flex gap-3 justify-end'>
                         <button
-                            onClick={() => navigate("/add_commande")}
+                            onClick={() => navigate("/add_achat")}
                             className="flex bg-teal-600 hover:bg-teal-700 px-4 py-2 rounded-lg transition-colors duration-200"
-                            title="Ajouter une commande"
+                            title="Ajouter un achat"
                         >
                             <AddIcon />
                         </button>
                         <button
-                            onClick={fetchCommandes}
+                            onClick={fetchAchats}
                             className="flex bg-teal-600 hover:bg-teal-700 px-4 py-2 rounded-lg transition-colors duration-200"
                             title="Actualiser"
                         >
                             <RefreshIcon />
                         </button>
-                        {filteredCommandes.length > 0 && (
+                        {filteredAchats.length > 0 && (
                             <button
-                                onClick={clearAllCommandes}
+                                onClick={clearAllAchats}
                                 disabled={clearingAll}
                                 className="flex bg-red-600 hover:bg-red-700 disabled:bg-red-400 px-4 py-2 rounded-lg transition-colors duration-200"
-                                title={`Supprimer toutes les commandes ${activeTab === 'en_attente' ? 'en attente' : 'validées'}`}
+                                title={`Supprimer tous les achats ${activeTab === 'en_attente' ? 'en attente' : 'validés'}`}
                             >
                                 {clearingAll ? (
                                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
@@ -306,35 +295,33 @@ export default function Commandes() {
                     </div>
                 </div>
 
-                {/* Onglets */}
                 <div className="mb-6">
                     <div className="flex border-b border-white/20">
                         <button
                             onClick={() => setActiveTab('en_attente')}
                             className={`px-6 py-3 font-medium transition-colors duration-200 border-b-2 ${activeTab === 'en_attente'
-                                    ? 'border-teal-500 text-teal-400 bg-white/10 rounded-tr-lg rounded-tl-lg'
-                                    : 'border-transparent text-gray-400 hover:text-white hover:bg-white/5'
+                                ? 'border-teal-500 text-teal-400 bg-white/10 rounded-tr-lg rounded-tl-lg'
+                                : 'border-transparent text-gray-400 hover:text-white hover:bg-white/5'
                                 }`}
                         >
-                            En Attente ({commandesEnAttente})
+                            En Attente ({achatsEnAttente})
                         </button>
                         <button
-                            onClick={() => setActiveTab('validees')}
-                            className={`px-6 py-3 font-medium transition-colors duration-200 border-b-2 ${activeTab === 'validees'
-                                    ? 'border-teal-500 text-teal-400 bg-white/10 rounded-tr-lg rounded-tl-lg'
-                                    : 'border-transparent text-gray-400 hover:text-white hover:bg-white/5'
+                            onClick={() => setActiveTab('valides')}
+                            className={`px-6 py-3 font-medium transition-colors duration-200 border-b-2 ${activeTab === 'valides'
+                                ? 'border-teal-500 text-teal-400 bg-white/10 rounded-tr-lg rounded-tl-lg'
+                                : 'border-transparent text-gray-400 hover:text-white hover:bg-white/5'
                                 }`}
                         >
-                            Validées ({commandesValidees})
+                            Validés ({achatsValides})
                         </button>
                     </div>
                 </div>
 
-                {/* États de chargement et d'erreur */}
                 {loading && (
                     <div className="flex justify-center items-center py-12">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500"></div>
-                        <span className="ml-3 text-lg">Chargement des commandes...</span>
+                        <span className="ml-3 text-lg">Chargement des achats...</span>
                     </div>
                 )}
 
@@ -344,7 +331,7 @@ export default function Commandes() {
                             Erreur lors du chargement: {error}
                         </p>
                         <button
-                            onClick={fetchCommandes}
+                            onClick={fetchAchats}
                             className="mt-2 bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm transition-colors duration-200"
                         >
                             Réessayer
@@ -352,74 +339,70 @@ export default function Commandes() {
                     </div>
                 )}
 
-                {/* Liste des commandes */}
                 {!loading && !error && (
                     <>
-                        {filteredCommandes.length === 0 ? (
+                        {filteredAchats.length === 0 ? (
                             <div className="text-center py-12">
                                 <div className="text-6xl mb-4">📦</div>
                                 <h3 className="text-xl font-semibold mb-2">
-                                    Aucune commande {activeTab === 'en_attente' ? 'en attente' : 'validée'} trouvée
+                                    Aucun achat {activeTab === 'en_attente' ? 'en attente' : 'validé'} trouvé
                                 </h3>
                                 <p className="text-gray-400">
                                     {activeTab === 'en_attente'
-                                        ? 'Les commandes en attente de validation apparaîtront ici.'
-                                        : 'Les commandes validées apparaîtront ici.'
+                                        ? 'Les achats en attente de validation apparaîtront ici.'
+                                        : 'Les achats validés apparaîtront ici.'
                                     }
                                 </p>
                             </div>
                         ) : (
                             <div className="grid gap-6">
-                                {[...filteredCommandes]
+                                {[...filteredAchats]
                                     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-                                    .map((commande) => (
+                                    .map((achat) => (
                                         <div
-                                            key={commande.id}
+                                            key={achat.id}
                                             className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300"
                                         >
-                                            {/* En-tête de la commande */}
                                             <div className="flex justify-between items-center mb-4">
                                                 <div>
-                                                    <h3 className="font-extrabold text-teal-400 ">
-                                                        Commande #{commande.id}
+                                                    <h3 className="font-extrabold text-teal-400">
+                                                        Achat #{achat.id}
                                                     </h3>
                                                     <p className="text-gray-300 mt-1 break-words">
-                                                        Client: {commande.customer_name.length > 15 ? `${commande.customer_name.slice(0, 15)}...` : commande.customer_name}
+                                                        Fournisseur: {achat.supplier_name.length > 15 ? `${achat.supplier_name.slice(0, 15)}...` : achat.supplier_name}
                                                     </p>
-                                                    <div className='flex flex-col gap-1 mt-2  items-start'>
+                                                    <div className='flex flex-col gap-1 mt-2 items-start'>
                                                         <p className="text-gray-400 text-sm">
-                                                            {formatDate(commande.created_at)}
+                                                            {formatDate(achat.created_at)}
                                                         </p>
                                                         <p className={
-                                                            commande.status === 'Validé' ?
+                                                            achat.status === 'Validé' ?
                                                                 "bg-green-600 px-2 py-1 rounded-md text-center text-sm" :
-                                                                commande.status === 'En attente' ?
+                                                                achat.status === 'En attente' ?
                                                                     "bg-yellow-600 px-2 py-1 rounded-md text-center text-sm" :
                                                                     "bg-gray-600 px-2 py-1 rounded-md text-center text-sm"
                                                         }>
-                                                            Status: {commande.status}
+                                                            Status: {achat.status}
                                                         </p>
                                                     </div>
-
                                                 </div>
                                                 <div className="text-right">
                                                     <p className="text-2xl font-bold text-teal-400">
-                                                        {commande.total_price} DA
+                                                        {achat.total_price} DA
                                                     </p>
                                                     <p className="text-sm text-gray-400">
-                                                        {commande.items ? commande.items.length : 0} article(s)
+                                                        {achat.items ? achat.items.length : 0} article(s)
                                                     </p>
                                                 </div>
                                             </div>
 
-                                            {/* Bouton Voir articles */}
-                                            {commande.items && commande.items.length > 0 && (
+                                            {achat.items && achat.items.length > 0 && (
                                                 <div className="mb-4 flex justify-between items-center">
                                                     <button
-                                                        onClick={() => toggleArticles(commande.id)}
+                                                        onClick={() => toggleArticles(achat.id)}
                                                         className="bg-teal-700 hover:bg-teal-600 px-4 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2"
                                                     >
-                                                        {expandedCommandes.has(commande.id) ? (
+                                                        {expandedAchats.has(achat.id) ? (
                                                             <>
                                                                 <span>Masquer articles</span>
                                                                 <svg className="w-4 h-4 transform rotate-180" fill="currentColor" viewBox="0 0 20 20">
@@ -428,7 +411,7 @@ export default function Commandes() {
                                                             </>
                                                         ) : (
                                                             <>
-                                                                <span>Voir articles ({commande.items.length})</span>
+                                                                <span>Voir articles ({achat.items.length})</span>
                                                                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                                                     <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                                                                 </svg>
@@ -436,30 +419,27 @@ export default function Commandes() {
                                                         )}
                                                     </button>
                                                     <button
-                                                        onClick={() => deleteCommande(commande.id)}
-                                                        disabled={deleting.has(commande.id)}
+                                                        onClick={() => deleteAchat(achat.id)}
+                                                        disabled={deleting.has(achat.id)}
                                                         className="bg-red-600 hover:bg-red-700 disabled:bg-red-400 px-4 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2"
                                                     >
-                                                        {deleting.has(commande.id) ? (
+                                                        {deleting.has(achat.id) ? (
                                                             <>
                                                                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                                                                 <span>Suppression...</span>
                                                             </>
                                                         ) : (
-                                                            <>
-                                                                <DeleteIcon className="w-4 h-4" />
-                                                            </>
+                                                            <DeleteIcon className="w-4 h-4" />
                                                         )}
                                                     </button>
                                                 </div>
                                             )}
 
-                                            {/* Articles de la commande */}
-                                            {commande.items && commande.items.length > 0 && expandedCommandes.has(commande.id) && (
+                                            {achat.items && achat.items.length > 0 && expandedAchats.has(achat.id) && (
                                                 <div className="border-t border-white/20 pt-4 mb-4">
                                                     <h4 className="text-lg font-medium mb-3 text-gray-200">Articles:</h4>
                                                     <div className="space-y-2">
-                                                        {commande.items.map((item, index) => (
+                                                        {achat.items.map((item, index) => (
                                                             <div
                                                                 key={index}
                                                                 className="flex justify-between items-center bg-white/5 rounded-lg p-3 animate-fadeIn"
@@ -472,7 +452,7 @@ export default function Commandes() {
                                                                         {item.product.name}
                                                                     </p>
                                                                     <p className="text-sm text-gray-400">
-                                                                        Prix unitaire: {item.product.price_v} DA
+                                                                        Prix unitaire: {item.product.price} DA
                                                                     </p>
                                                                 </div>
                                                                 <div className="text-right">
@@ -489,15 +469,14 @@ export default function Commandes() {
                                                 </div>
                                             )}
 
-                                            {/* Actions */}
                                             <div className="flex justify-end mt-4 space-x-3">
-                                                {commande.status !== 'Validé' && (
+                                                {achat.status !== 'Validé' && (
                                                     <button
-                                                        onClick={() => validateCommande(commande.id)}
-                                                        disabled={validating.has(commande.id)}
+                                                        onClick={() => validateAchat(achat.id)}
+                                                        disabled={validating.has(achat.id)}
                                                         className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 px-4 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2"
                                                     >
-                                                        {validating.has(commande.id) ? (
+                                                        {validating.has(achat.id) ? (
                                                             <>
                                                                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                                                                 <span>Validation...</span>
@@ -508,15 +487,14 @@ export default function Commandes() {
                                                     </button>
                                                 )}
 
-                                                {commande.status !== 'Validé' && (
+                                                {achat.status !== 'Validé' && (
                                                     <button
-                                                        className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors duration-200 "
-                                                        onClick={() => navigate(`/edit_commande/${commande.id}`)}
+                                                        className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors duration-200"
+                                                        onClick={() => navigate(`/edit_achat/${achat.id}`)}
                                                     >
                                                         <EditIcon className="w-4 h-4" />
                                                     </button>
                                                 )}
-
                                             </div>
                                         </div>
                                     ))}

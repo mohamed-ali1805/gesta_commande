@@ -430,7 +430,7 @@ class ValiderCommandeView(APIView):
         os.makedirs(folder_path, exist_ok=True)
 
         # Nettoyer le nom du client pour le nom de fichier
-        safe_filename = re.sub(r'[\\/*?:"<>|]', "_", commande.customer_name)
+        safe_filename = re.sub(r'[\\/*?:"<>|]', "_", f"{commande.customer_name}-{commande.id}")
         file_path = os.path.join(folder_path, f"{safe_filename}.txt")
 
         try:
@@ -647,7 +647,7 @@ class ValiderAchatView(APIView):
         try:
             with open(file_path, "w", encoding="utf-8") as file:
                 # Écrire le nom de l'achat/fournisseur
-                file.write(f"{achat.supplier_name}\n")
+                file.write(f"{achat.supplier_name}-{achat.id}\n")
 
                 # Écrire chaque produit de l'achat
                 achat_items = AchatItem.objects.filter(achat=achat)
@@ -660,3 +660,80 @@ class ValiderAchatView(APIView):
             return Response({'detail': f"Erreur lors de la génération du fichier : {str(e)}"}, status=500)
 
         return Response({'detail': 'Achat validé avec succès.'}, status=status.HTTP_200_OK)
+
+class RegenererFichierAchatView(APIView):
+    def post(self, request, achat_id):
+        achat = get_object_or_404(Achat, id=achat_id)
+
+        if achat.status != 'Validé':
+            return Response(
+                {'detail': 'L\'achat doit être validé pour régénérer le fichier.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        folder_path = r"C:\gesta-achats-files"
+        os.makedirs(folder_path, exist_ok=True)
+
+        safe_filename = re.sub(r'[\\/*?:"<>|]', "_", f"{achat.supplier_name}-{achat.id}")
+        file_path = os.path.join(folder_path, f"{safe_filename}.txt")
+
+        try:
+            # Supprimer l'ancien fichier s'il existe
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
+            # Recréer le fichier
+            with open(file_path, "w", encoding="utf-8") as file:
+                file.write(f"{achat.supplier_name}\n")
+
+                achat_items = AchatItem.objects.filter(achat=achat)
+                for item in achat_items:
+                    product = item.product
+                    line = f"{product.reference}${product.name}${item.quantity}${product.price}${product.price_v}${item.total_price()}${achat.total_price}#\n"
+                    file.write(line)
+
+        except Exception as e:
+            return Response(
+                {'detail': f"Erreur lors de la régénération du fichier : {str(e)}"},
+                status=500
+            )
+
+        return Response({'detail': 'Fichier régénéré avec succès.'}, status=status.HTTP_200_OK)
+    
+
+class RegenererFichierCommandeView(APIView):
+    def post(self, request, commande_id):
+        commande = get_object_or_404(Order, id=commande_id)
+
+        if commande.status != 'Validé':
+            return Response(
+                {'detail': 'La commande doit être validée pour régénérer le fichier.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        folder_path = r"C:\gesta-commandes-files"  # adapter selon ton dossier
+        os.makedirs(folder_path, exist_ok=True)
+
+        safe_filename = re.sub(r'[\\/*?:"<>|]', "_", f"{commande.customer_name}-{commande.id}")
+        file_path = os.path.join(folder_path, f"{safe_filename}.txt")
+
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
+            with open(file_path, "w", encoding="utf-8") as file:
+                file.write(f"{commande.customer_name}\n")
+
+                commande_items = OrderItem.objects.filter(order=commande)
+                for item in commande_items:
+                    product = item.product
+                    line = f"{product.reference}${product.name}${item.quantity}${product.price_v}${item.total_price}${commande.total_price}#\n"
+                    file.write(line)
+
+        except Exception as e:
+            return Response(
+                {'detail': f"Erreur lors de la régénération du fichier : {str(e)}"},
+                status=500
+            )
+
+        return Response({'detail': 'Fichier régénéré avec succès.'}, status=status.HTTP_200_OK)

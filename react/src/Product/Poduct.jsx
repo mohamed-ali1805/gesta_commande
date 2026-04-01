@@ -8,6 +8,8 @@ import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import TransferWithinAStationIcon from '@mui/icons-material/TransferWithinAStation';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
+import HomeFilledIcon from '@mui/icons-material/HomeFilled';
+import Navbar from '../Main/Navbar';
 export default function Product() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [customerName, setCustomerName] = useState('');
@@ -21,7 +23,7 @@ export default function Product() {
     const [error, setError] = useState(null);
     const [submitting, setSubmitting] = useState(false);
     const [totalCount, setTotalCount] = useState(0);
-    
+    const [searchField, setSearchField] = useState('name');
     const navigate = useNavigate();
     // Configuration de l'URL de base de votre API Django
     const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -34,7 +36,7 @@ export default function Product() {
             } else {
                 setLoadingMore(true);
             }
-            
+
             const response = await fetch(url);
 
             if (!response.ok) {
@@ -42,7 +44,7 @@ export default function Product() {
             }
 
             const data = await response.json();
-            
+
             if (isLoadMore) {
                 // Ajouter les nouveaux produits aux existants
                 setProducts(prevProducts => [...prevProducts, ...data.results]);
@@ -52,11 +54,11 @@ export default function Product() {
                 setProducts(data.results);
                 setFilteredProducts(data.results);
             }
-            
+
             setNextPage(data.next);
             setTotalCount(data.count || data.results.length);
             setError(null);
-            
+
         } catch (err) {
             setError(err.message);
             console.error('Erreur lors du chargement des produits:', err);
@@ -69,7 +71,7 @@ export default function Product() {
     // Fonction pour rafraîchir les produits depuis le serveur externe
     const refreshProducts = async () => {
         setLoading(true);
-        
+
         try {
             const response = await fetch(`${API_BASE_URL}/api/refresh_products/`);
 
@@ -79,7 +81,7 @@ export default function Product() {
 
             const data = await response.json();
             console.log("Produits rafraîchis:", data);
-            
+
         } catch (error) {
             console.error("Erreur lors du rafraîchissement des produits:", error);
             setError("Erreur lors du rafraîchissement des produits");
@@ -92,22 +94,24 @@ export default function Product() {
     };
 
     // Effet pour la recherche avec debounce
-useEffect(() => {
-    const delayDebounce = setTimeout(() => {
-        const scrollY = window.scrollY; // Mémoriser la position Y
+    useEffect(() => {
+        const delayDebounce = setTimeout(() => {
+            const scrollY = window.scrollY;
 
-        const searchUrl = `${API_BASE_URL}/api/products/${searchTerm ? `?search=${encodeURIComponent(searchTerm)}` : ''}`;
-        
-        fetchProducts(searchUrl).then(() => {
-            // Restaurer la position après le fetch et mise à jour DOM
-            setTimeout(() => {
-                window.scrollTo(0, scrollY);
-            }, 0);
-        });
-    }, 300); // debounce 300ms
+            let searchUrl = `${API_BASE_URL}/api/products/`;
+            if (searchTerm) {
+                searchUrl += `?${searchField}=${encodeURIComponent(searchTerm)}`;
+            }
 
-    return () => clearTimeout(delayDebounce);
-}, [searchTerm, API_BASE_URL]);
+            fetchProducts(searchUrl).then(() => {
+                setTimeout(() => {
+                    window.scrollTo(0, scrollY);
+                }, 0);
+            });
+        }, 300);
+
+        return () => clearTimeout(delayDebounce);
+    }, [searchTerm, searchField, API_BASE_URL]); // ajouter searchField
 
 
     // Charger plus de produits
@@ -136,103 +140,25 @@ useEffect(() => {
     return (
         <div className="bg-gradient-to-r from-[#081c3c] to-[#000000] text-white min-h-screen">
             {/* NAVBAR */}
-            <div className="sticky top-0 z-50 bg-gradient-to-r from-[#081c3c] to-[#000000] border-b border-white/10">
-                <div className="container mx-auto px-4 sm:px-6 py-4">
-                    <div className="flex justify-between items-center">
-
-                        {/* Logo et titre */}
-                        <div className="flex items-center gap-2 sm:gap-3" onClick={() => navigate("/")} style={{ cursor: 'pointer' }}
->
-                            <img src={logo} alt="Logo" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full" />
-                            <h1 className="text-lg sm:text-2xl font-bold text-teal-400">Gesta Order</h1>
-                        </div>
-
-                        {/* Menu desktop */}
-                        <div className="hidden md:flex gap-3 lg:gap-4">
-                            <button
-                                onClick={() => navigate("/product")}
-                                className="flex items-center gap-2 bg-white/10 px-3 lg:px-4 py-2 rounded-xl hover:bg-white/20 transition border border-white/20 text-sm"
-                            >
-                                <StoreIcon style={{ fontSize: 20 }} />
-                                <span className="hidden lg:inline">Produits</span>
-                            </button>
-                            <button
-                                onClick={() => navigate("/commandes")}
-                                className="flex items-center gap-2 bg-white/10 px-3 lg:px-4 py-2 rounded-xl hover:bg-white/20 transition border border-white/20 text-sm"
-                            >
-                                <ShoppingCartIcon style={{ fontSize: 20 }} />
-                                <span className="hidden lg:inline">Commandes</span>
-                            </button>
-                            <button
-                                onClick={() => navigate("/achats")}
-                                className="flex items-center gap-2 bg-white/10 px-3 lg:px-4 py-2 rounded-xl hover:bg-white/20 transition border border-white/20 text-sm"
-                            >
-                                <TransferWithinAStationIcon style={{ fontSize: 20 }} />
-                                <span className="hidden lg:inline">Achats</span>
-                            </button>
-                        </div>
-
-                        {/* Bouton menu mobile */}
-                        <button
-                            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                            className="md:hidden bg-white/10 p-2 rounded-lg hover:bg-white/20 transition"
-                        >
-                            {mobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
-                        </button>
-                    </div>
-
-                    {/* Menu mobile déroulant */}
-                    {mobileMenuOpen && (
-                        <div className="md:hidden mt-4 space-y-2 pb-4">
-                            <button
-                                onClick={() => {
-                                    navigate("/product");
-                                    setMobileMenuOpen(false);
-                                }}
-                                className="w-full flex items-center gap-3 bg-white/10 px-4 py-3 rounded-xl hover:bg-white/20 transition border border-white/20"
-                            >
-                                <StoreIcon style={{ fontSize: 20 }} /> Produits
-                            </button>
-                            <button
-                                onClick={() => {
-                                    navigate("/commandes");
-                                    setMobileMenuOpen(false);
-                                }}
-                                className="w-full flex items-center gap-3 bg-white/10 px-4 py-3 rounded-xl hover:bg-white/20 transition border border-white/20"
-                            >
-                                <ShoppingCartIcon style={{ fontSize: 20 }} /> Commandes
-                            </button>
-                            <button
-                                onClick={() => {
-                                    navigate("/achats");
-                                    setMobileMenuOpen(false);
-                                }}
-                                className="w-full flex items-center gap-3 bg-white/10 px-4 py-3 rounded-xl hover:bg-white/20 transition border border-white/20"
-                            >
-                                <TransferWithinAStationIcon style={{ fontSize: 20 }} /> Achats
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
+            <Navbar />
 
             <div className="container mx-auto px-5 py-8">
                 {/* En-tête */}
                 <div className="flex justify-between items-center mb-8">
                     <h2 className="text-2xl font-bold text-teal-400 flex items-center gap-5">
-                        <ArrowBackIcon 
-                            onClick={() => navigate("/")} 
+                        <ArrowBackIcon
+                            onClick={() => navigate("/")}
                             className="cursor-pointer hover:text-teal-300 transition"
                         />
                         <p>Mes Produits</p>
-                        
+
                     </h2>
-                    <button 
+                    <button
                         onClick={refreshProducts}
                         className="bg-teal-600 hover:bg-teal-700 px-4 py-2 rounded-lg transition-colors duration-200"
                         disabled={loading}
                     >
-                        <RefreshIcon className={loading ? 'animate-spin' : ''}/>
+                        <RefreshIcon className={loading ? 'animate-spin' : ''} />
                     </button>
                 </div>
 
@@ -254,13 +180,43 @@ useEffect(() => {
 
                     {/* Barre de recherche */}
                     <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 mb-6">
+                        {/* Boutons radio */}
+                        <div className="mb-4">
+                            <label className="text-sm font-medium text-gray-300 mb-2 block">Rechercher par :</label>
+                            <div className="flex gap-6">
+                                <label className="flex items-center cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="searchField"
+                                        value="name"
+                                        checked={searchField === 'name'}
+                                        onChange={(e) => setSearchField(e.target.value)}
+                                        className="mr-2 text-teal-500 focus:ring-teal-500"
+                                    />
+                                    <span className="text-white">Nom</span>
+                                </label>
+                                <label className="flex items-center cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="searchField"
+                                        value="reference"
+                                        checked={searchField === 'reference'}
+                                        onChange={(e) => setSearchField(e.target.value)}
+                                        className="mr-2 text-teal-500 focus:ring-teal-500"
+                                    />
+                                    <span className="text-white">Référence</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* Champ de recherche */}
                         <div className="flex items-center space-x-3">
                             <div className="flex-1 relative">
                                 <input
                                     type="text"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    placeholder="Rechercher un produit par nom ou référence..."
+                                    placeholder={`Rechercher un produit par ${searchField === 'name' ? 'nom' : 'référence'}...`}
                                     className="w-full px-4 py-3 pl-10 bg-white/20 border border-white/30 rounded-lg text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                                 />
                                 <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
@@ -281,7 +237,6 @@ useEffect(() => {
                                 </button>
                             )}
                         </div>
-                        
                     </div>
 
                     {/* Indicateur de chargement initial */}
@@ -340,11 +295,12 @@ useEffect(() => {
                                                 key={product.id}
                                                 product={product}
                                                 searchTerm={searchTerm}
+                                                searchField={searchField}  // ajouter
                                                 highlightText={highlightText}
                                             />
                                         ))}
                                     </div>
-                                    
+
                                     {/* Bouton "Charger plus" */}
                                     {nextPage && (
                                         <div className="flex justify-center py-6">
@@ -380,7 +336,7 @@ useEffect(() => {
 }
 
 // Composant pour chaque produit
-function ProductCard({ product, searchTerm, highlightText }) {
+function ProductCard({ product, searchTerm, searchField, highlightText }) {
     const availableStock = product.stock >= 0 ? product.stock : 'Rupture de stock';
 
     return (
@@ -388,10 +344,16 @@ function ProductCard({ product, searchTerm, highlightText }) {
             <div className="flex justify-between items-center">
                 <div className="flex-1">
                     <h4 className="text-lg font-bold text-white mb-2">
-                        {highlightText(product.reference, searchTerm)}
+                        {searchField === 'reference'
+                            ? highlightText(product.reference, searchTerm)
+                            : product.reference
+                        }
                     </h4>
                     <p className="text-gray-300 mb-2">
-                        {highlightText(product.name, searchTerm)}
+                        {searchField === 'name'
+                            ? highlightText(product.name, searchTerm)
+                            : product.name
+                        }
                     </p>
                     <p className="text-teal-400 font-medium text-xl mb-1">Prix: {product.price_v}DA</p>
                     <p className="text-gray-300 text-sm">

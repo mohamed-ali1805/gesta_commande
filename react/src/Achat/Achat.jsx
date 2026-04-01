@@ -20,7 +20,8 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
 import 'dayjs/locale/fr';
-
+import HomeFilledIcon from '@mui/icons-material/HomeFilled';
+import Navbar from '../Main/Navbar';
 export default function Achats() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [achats, setAchats] = useState([]);
@@ -37,7 +38,37 @@ export default function Achats() {
 
     const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
     const [expandedAchats, setExpandedAchats] = useState(new Set());
+const [regenerating, setRegenerating] = useState(new Set());
 
+const regenererFichier = async (achatId) => {
+    if (!confirm('Voulez-vous régénérer le fichier de cet achat ? L\'ancien fichier sera écrasé.')) return;
+
+    try {
+        setRegenerating(prev => new Set(prev).add(achatId));
+
+        const response = await fetch(`${API_BASE_URL}/api/regenerer_fichier_achat/${achatId}/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.detail || `Erreur HTTP: ${response.status}`);
+        }
+
+        alert('Fichier régénéré avec succès !');
+
+    } catch (err) {
+        console.error('Erreur lors de la régénération:', err);
+        alert(`Erreur: ${err.message}`);
+    } finally {
+        setRegenerating(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(achatId);
+            return newSet;
+        });
+    }
+};
     const toggleArticles = (achatId) => {
         const newExpanded = new Set(expandedAchats);
         if (newExpanded.has(achatId)) {
@@ -218,79 +249,7 @@ export default function Achats() {
     return (
         <div className="bg-gradient-to-r from-[#081c3c] to-[#000000] text-white min-h-screen">
             {/* NAVBAR */}
-            <div className="sticky top-0 z-50 bg-gradient-to-r from-[#081c3c] to-[#000000] border-b border-white/10">
-                <div className="container mx-auto px-4 sm:px-6 py-4">
-                    <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2 sm:gap-3" onClick={() => navigate("/")} style={{ cursor: 'pointer' }}>
-                            <img src={logo} alt="Logo" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full" />
-                            <h1 className="text-lg sm:text-2xl font-bold text-teal-400">Gesta Order</h1>
-                        </div>
-
-                        <div className="hidden md:flex gap-3 lg:gap-4">
-                            <button
-                                onClick={() => navigate("/product")}
-                                className="flex items-center gap-2 bg-white/10 px-3 lg:px-4 py-2 rounded-xl hover:bg-white/20 transition border border-white/20 text-sm"
-                            >
-                                <StoreIcon style={{ fontSize: 20 }} />
-                                <span className="hidden lg:inline">Produits</span>
-                            </button>
-                            <button
-                                onClick={() => navigate("/commandes")}
-                                className="flex items-center gap-2 bg-white/10 px-3 lg:px-4 py-2 rounded-xl hover:bg-white/20 transition border border-white/20 text-sm"
-                            >
-                                <ShoppingCartIcon style={{ fontSize: 20 }} />
-                                <span className="hidden lg:inline">Commandes</span>
-                            </button>
-                            <button
-                                onClick={() => navigate("/achats")}
-                                className="flex items-center gap-2 bg-white/10 px-3 lg:px-4 py-2 rounded-xl hover:bg-white/20 transition border border-white/20 text-sm"
-                            >
-                                <TransferWithinAStationIcon style={{ fontSize: 20 }} />
-                                <span className="hidden lg:inline">Achats</span>
-                            </button>
-                        </div>
-
-                        <button
-                            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                            className="md:hidden bg-white/10 p-2 rounded-lg hover:bg-white/20 transition"
-                        >
-                            {mobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
-                        </button>
-                    </div>
-
-                    {mobileMenuOpen && (
-                        <div className="md:hidden mt-4 space-y-2 pb-4">
-                            <button
-                                onClick={() => {
-                                    navigate("/product");
-                                    setMobileMenuOpen(false);
-                                }}
-                                className="w-full flex items-center gap-3 bg-white/10 px-4 py-3 rounded-xl hover:bg-white/20 transition border border-white/20"
-                            >
-                                <StoreIcon style={{ fontSize: 20 }} /> Produits
-                            </button>
-                            <button
-                                onClick={() => {
-                                    navigate("/commandes");
-                                    setMobileMenuOpen(false);
-                                }}
-                                className="w-full flex items-center gap-3 bg-white/10 px-4 py-3 rounded-xl hover:bg-white/20 transition border border-white/20"
-                            >
-                                <ShoppingCartIcon style={{ fontSize: 20 }} /> Commandes
-                            </button>
-                            <button
-                                onClick={() => {
-                                    navigate("/achats");
-                                    setMobileMenuOpen(false);
-                                }}
-                                className="w-full flex items-center gap-3 bg-white/10 px-4 py-3 rounded-xl hover:bg-white/20 transition border border-white/20"
-                            >
-                                <TransferWithinAStationIcon style={{ fontSize: 20 }} /> Achats
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
+            <Navbar />
 
             <div className="px-3 sm:px-5 py-4 sm:py-8">
                 <div className="flex-col items-center mb-6 sm:mb-8">
@@ -536,6 +495,20 @@ export default function Achats() {
 
                                                             </button>
                                                         )}
+                                                        {achat.status === 'Validé' && (
+    <button
+        onClick={(e) => { e.stopPropagation(); regenererFichier(achat.id); }}
+        disabled={regenerating.has(achat.id)}
+        className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 p-2 rounded-lg transition-colors duration-200"
+        title="Régénérer fichier"
+    >
+        {regenerating.has(achat.id) ? (
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+        ) : (
+            <RefreshIcon className="text-base sm:text-lg" />
+        )}
+    </button>
+)}
 
                                                         <button
                                                             onClick={(e) => {
@@ -706,6 +679,25 @@ export default function Achats() {
                                                         <span>Modifier</span>
                                                     </button>
                                                 )}
+                                                {achat.status === 'Validé' && (
+    <button
+        onClick={() => regenererFichier(achat.id)}
+        disabled={regenerating.has(achat.id)}
+        className="w-full sm:w-auto bg-green-600 hover:bg-green-700 disabled:bg-green-400 px-4 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 text-sm"
+    >
+        {regenerating.has(achat.id) ? (
+            <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span>Génération...</span>
+            </>
+        ) : (
+            <>
+                <RefreshIcon className="w-4 h-4" />
+                <span>Revalider</span>
+            </>
+        )}
+    </button>
+)}
                                             </div>
                                         </div>
                                     ))}

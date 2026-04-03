@@ -641,7 +641,7 @@ class ValiderAchatView(APIView):
         os.makedirs(folder_path, exist_ok=True)
 
         # Nettoyer le nom du fournisseur pour le nom de fichier
-        safe_filename = re.sub(r'[\\/*?:"<>|]', "_", achat.supplier_name)
+        safe_filename = re.sub(r'[\\/*?:"<>|]', "_", f"{achat.supplier_name}-{achat.id}")
         file_path = os.path.join(folder_path, f"{safe_filename}.txt")
 
         try:

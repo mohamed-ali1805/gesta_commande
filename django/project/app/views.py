@@ -727,7 +727,7 @@ class RegenererFichierCommandeView(APIView):
                 commande_items = OrderItem.objects.filter(order=commande)
                 for item in commande_items:
                     product = item.product
-                    line = f"{product.reference}${product.name}${item.quantity}${product.price_v}${item.total_price}${commande.total_price}#\n"
+                    line = f"{product.reference}${product.name}${item.quantity}${product.price}${product.price_v}${item.total_price()}${commande.total_price}#\n"
                     file.write(line)
 
         except Exception as e:

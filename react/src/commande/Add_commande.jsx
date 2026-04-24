@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useNavigate } from "react-router-dom";
@@ -10,6 +10,8 @@ import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
 import HomeFilledIcon from '@mui/icons-material/HomeFilled';
 import Navbar from '../Main/Navbar';
+import { BrowserMultiFormatReader } from '@zxing/browser';
+import { BarcodeFormat, DecodeHintType } from '@zxing/library';
 export default function Add_commande() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [customerName, setCustomerName] = useState('');
@@ -24,9 +26,102 @@ export default function Add_commande() {
     const [error, setError] = useState(null);
     const [totalCount, setTotalCount] = useState(0);
     const [submitting, setSubmitting] = useState(false);
+    
+
+
+const [scannerOpen, setScannerOpen] = useState(false);
+
+    const videoRef = useRef(null);
+    const codeReaderRef = useRef(null);
+    // Chaque session de scan a un ID unique.
+    // Quand stopScanner est appelé, on incrémente ce compteur.
+    // Le callback zxing compare son ID capturé au moment du lancement
+    // avec la valeur courante : s'ils diffèrent, le callback est orphelin et s'ignore.
+    const scanSessionId = useRef(0);
+
     const navigate = useNavigate();
-    // Configuration de l'URL de base de votre API Django
     const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
+    // Tuer proprement le flux vidéo et le codeReader
+    const killScanner = () => {
+        if (codeReaderRef.current) {
+            try { codeReaderRef.current.reset(); } catch (_) {}
+            codeReaderRef.current = null;
+        }
+        if (videoRef.current?.srcObject) {
+            videoRef.current.srcObject.getTracks().forEach(t => t.stop());
+            videoRef.current.srcObject = null;
+        }
+    };
+
+    const stopScanner = () => {
+        // Invalider TOUS les callbacks en cours en changeant l'ID de session
+        scanSessionId.current += 1;
+        killScanner();
+        setScannerOpen(false);
+    };
+
+    const startScanner = async () => {
+        // 1. Tuer l'éventuel scanner précédent
+        killScanner();
+
+        // 2. Vider la recherche et passer en mode référence
+        setSearchTerm('');
+        setSearchField('reference');
+
+        // 3. Incrémenter l'ID de session — tous les anciens callbacks deviennent orphelins
+        scanSessionId.current += 1;
+        const mySessionId = scanSessionId.current;
+
+        setScannerOpen(true);
+
+        // 4. Laisser React rendre la modale + la balise <video>
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        // Si l'utilisateur a déjà fermé pendant le délai, abandonner
+        if (mySessionId !== scanSessionId.current) return;
+
+        try {
+            
+            // Vérifier encore une fois (l'import est async et peut prendre du temps)
+            if (mySessionId !== scanSessionId.current) return;
+
+            const hints = new Map();
+            hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13]);
+
+            const codeReader = new BrowserMultiFormatReader(hints);
+            codeReaderRef.current = codeReader;
+
+            const devices = await BrowserMultiFormatReader.listVideoInputDevices();
+            const deviceId = devices[devices.length - 1]?.deviceId;
+
+            if (mySessionId !== scanSessionId.current) return;
+
+            codeReader.decodeFromVideoDevice(deviceId, videoRef.current, (result, err) => {
+                // Ce callback peut être appelé des dizaines de fois par seconde.
+                // On l'ignore s'il appartient à une session révoquée.
+                if (mySessionId !== scanSessionId.current) return;
+                if (!result) return;
+
+                const barcode = result.getText();
+
+                // Révoquer immédiatement cette session avant de faire quoi que ce soit
+                scanSessionId.current += 1;
+
+                setSearchField('reference');
+                setSearchTerm(barcode);
+                killScanner();
+                setScannerOpen(false);
+            });
+
+        } catch (e) {
+            console.error('Erreur scanner:', e);
+            if (mySessionId === scanSessionId.current) {
+                stopScanner();
+            }
+        }
+    };
+
 
     // Fonction pour récupérer les produits
     const fetchProducts = async (url, isLoadMore = false) => {
@@ -222,7 +317,7 @@ export default function Add_commande() {
             {/* NAVBAR */}
             <Navbar />
 
-            <div className="container mx-auto px-5 py-8">
+            <div className="w-full max-w-full px-5 py-8">
                 {/* En-tête */}
                 <div className="mb-8">
                     <h2 className="text-2xl font-bold text-teal-400 flex items-center gap-5 mb-6"><ArrowBackIcon onClick={() => navigate("/commandes")} className="cursor-pointer hover:text-teal-300 transition" /><p>Ajouter une commande</p></h2>
@@ -277,16 +372,16 @@ export default function Add_commande() {
 
                 {/* Liste des produits */}
                 <div>
-                    <div className="flex justify-between items-center mb-6">
+                    <div className="flex flex-wrap justify-between items-center gap-2 mb-6">
                         <h3 className="text-xl font-bold text-teal-400">Produits disponibles</h3>
                         <div className="flex items-center gap-4">
                             <span className="text-sm text-gray-300">
                                 {products.length} / {totalCount} produit(s)
                             </span>
                             {searchTerm && (
-                                <span className="text-xs text-teal-300 bg-teal-900/30 px-2 py-1 rounded">
-                                    Recherche par {searchField === 'name' ? 'nom' : 'référence'}: "{searchTerm}"
-                                </span>
+                                <span className="text-xs text-teal-300 bg-teal-900/30 px-2 py-1 rounded max-w-[160px] truncate">
+    Recherche: "{searchTerm}"
+</span>
                             )}
                         </div>
                     </div>
@@ -295,8 +390,10 @@ export default function Add_commande() {
                     <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 mb-6">
                         {/* Boutons radio pour choisir le type de recherche */}
                         <div className="mb-4">
-                            <label className="text-sm font-medium text-gray-300 mb-2 block">Rechercher par :</label>
-                            <div className="flex gap-6">
+                            <label className="text-sm font-medium text-gray-300 mb-2 block">
+                                Rechercher par :
+                            </label>
+                            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                                 <label className="flex items-center cursor-pointer">
                                     <input
                                         type="radio"
@@ -319,6 +416,21 @@ export default function Add_commande() {
                                     />
                                     <span className="text-white">Référence</span>
                                 </label>
+
+                                <button
+                                    onClick={startScanner}
+                                    type="button"
+                                    title="Scanner un code-barres EAN-13"
+                                    className="flex items-center gap-2 bg-teal-700 hover:bg-teal-600 active:bg-teal-800 px-3 py-1.5 rounded-lg transition-colors duration-200 text-sm font-medium text-white whitespace-nowrap"
+                                >
+                                    <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                                            d="M3 9V6a1 1 0 011-1h3M3 15v3a1 1 0 001 1h3m12-9V6a1 1 0 00-1-1h-3m4 9v3a1 1 0 01-1 1h-3" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                                            d="M7 8v8M10 8v8M13 8v8M16 8v8" />
+                                    </svg>
+                                    Scanner
+                                </button>
                             </div>
                         </div>
 
@@ -405,7 +517,7 @@ export default function Add_commande() {
                                 </div>
                             ) : (
                                 <>
-                                    <div className="grid gap-4 mb-6">
+                                    <div className="flex flex-col gap-4 justify-center">
                                         {products.map((product) => (
                                             <ProductCard
                                                 key={product.id}
@@ -449,6 +561,55 @@ export default function Add_commande() {
                     )}
                 </div>
             </div>
+
+{/* ===== MODALE SCANNER ===== */}
+            {scannerOpen && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4"
+                    onClick={(e) => { if (e.target === e.currentTarget) stopScanner(); }}
+                >
+                    <div className="bg-[#081c3c] border border-teal-700 rounded-2xl p-4 w-full max-w-xs shadow-2xl">
+
+                        <div className="flex justify-between items-center mb-3">
+                            <h3 className="text-teal-400 font-bold text-base flex items-center gap-2">
+                                <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                                        d="M7 8v8M10 8v8M13 8v8M16 8v8M3 9V6a1 1 0 011-1h3M3 15v3a1 1 0 001 1h3m12-9V6a1 1 0 00-1-1h-3m4 9v3a1 1 0 01-1 1h-3" />
+                                </svg>
+                                Scanner EAN-13
+                            </h3>
+                            <button onClick={stopScanner} type="button"
+                                className="text-gray-400 hover:text-white transition-colors p-1">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="relative rounded-xl overflow-hidden bg-black" style={{ height: '220px' }}>
+                            <video ref={videoRef} className="w-full h-full object-cover"
+                                autoPlay muted playsInline />
+                            <div className="absolute inset-0 pointer-events-none">
+                                <div className="absolute left-6 right-6 top-1/2 h-0.5 bg-teal-400 opacity-80 animate-pulse" />
+                                <div className="absolute top-3 left-3 w-5 h-5 border-t-2 border-l-2 border-teal-400" />
+                                <div className="absolute top-3 right-3 w-5 h-5 border-t-2 border-r-2 border-teal-400" />
+                                <div className="absolute bottom-3 left-3 w-5 h-5 border-b-2 border-l-2 border-teal-400" />
+                                <div className="absolute bottom-3 right-3 w-5 h-5 border-b-2 border-r-2 border-teal-400" />
+                            </div>
+                        </div>
+
+                        <p className="text-center text-gray-400 text-sm mt-3">
+                            Pointez vers un code-barres EAN-13
+                        </p>
+
+                        <button onClick={stopScanner} type="button"
+                            className="mt-3 w-full bg-gray-700 hover:bg-gray-600 py-2 rounded-lg text-sm text-gray-200 transition-colors">
+                            Annuler
+                        </button>
+                    </div>
+                </div>
+            )}
+            
         </div>
     );
 }
@@ -466,15 +627,16 @@ function ProductCard({ product, onAddToCart, cartQuantity, searchTerm, searchFie
     };
 
     return (
-        <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300">
+        <div className="bg-white/10  backdrop-blur-sm rounded-xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300">
             <div className="">
-                <div className="flex-1">
-                    <h4 className="text-lg font-bold text-white mb-2">
-                        {searchField === 'reference' 
-                            ? highlightText(product.reference, searchTerm)
-                            : product.reference
-                        }
-                    </h4>
+                <div className="flex-1 ">
+                    <h4 className="text-sm font-bold text-gray-300 mb-2 flex flex-col">
+    {product.references.map(ref => (
+        <span key={ref.id} className="mr-2">
+            {highlightText(ref.code, searchTerm)}
+        </span>
+    ))}
+</h4>
                     <p className="text-gray-300 mb-2">
                         {searchField === 'name' 
                             ? highlightText(product.name, searchTerm)

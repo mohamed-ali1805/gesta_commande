@@ -1,8 +1,16 @@
 from rest_framework import serializers
-from .models import Product, Order, OrderItem,AchatItem,Achat
+from .models import Product, Order, OrderItem,AchatItem,Achat, Reference
+
+
+class ReferenceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Reference
+        fields = '__all__'
 
 
 class ProductSerializer(serializers.ModelSerializer):
+    references = ReferenceSerializer(many=True, read_only=True)
+
     class Meta:
         model = Product
         fields = '__all__'
@@ -16,7 +24,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OrderItem
-        fields = ['id', 'product', 'product_id', 'quantity', 'total_price']
+        fields = ['id', 'product','product_id', 'quantity', 'price_snapshot', 'price_v_snapshot', 'total_price']
     
     total_price = serializers.SerializerMethodField()
 
@@ -41,7 +49,7 @@ class AchatItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AchatItem
-        fields = ['id', 'product', 'product_id', 'quantity', 'total_price']
+        fields = ['id', 'product','product_id', 'quantity', 'price_snapshot', 'price_v_snapshot', 'total_price']
     
     total_price = serializers.SerializerMethodField()
 

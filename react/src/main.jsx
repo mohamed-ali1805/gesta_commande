@@ -28,9 +28,12 @@ const darkTheme = createTheme(
       },
       MuiInputLabel: {
         styleOverrides: {
-          root: { color: "rgba(255,255,255,0.7)" },
-          focused: { color: "#14b8a6" },
-        },
+  "root": {
+    "&.Mui-focused": {
+      "color": "#14b8a6"
+    }
+  }
+},
       },
       MuiIconButton: {
         styleOverrides: {

@@ -266,7 +266,7 @@ const regenererFichier = async (achatId) => {
                             title="Ajouter un achat"
                         >
                             <AddIcon className="text-lg sm:text-xl" />
-                            <span className="hidden sm:inline">Ajouter</span>
+                            
                         </button>
                         <button
                             onClick={fetchAchats}
@@ -274,7 +274,7 @@ const regenererFichier = async (achatId) => {
                             title="Actualiser"
                         >
                             <RefreshIcon className="text-lg sm:text-xl" />
-                            <span className="hidden sm:inline">Actualiser</span>
+                            
                         </button>
                         <button
                             onClick={() => setIsCompactView(!isCompactView)}
@@ -282,7 +282,7 @@ const regenererFichier = async (achatId) => {
                             title={isCompactView ? "Vue détaillée" : "Vue compacte"}
                         >
                             {isCompactView ? <ViewModuleIcon className="text-lg sm:text-xl" /> : <ViewListIcon className="text-lg sm:text-xl" />}
-                            <span className="hidden sm:inline">{isCompactView ? "Détaillé" : "Compact"}</span>
+                           
                         </button>
                         {filteredAchats.length > 0 && (
                             <button
@@ -296,7 +296,7 @@ const regenererFichier = async (achatId) => {
                                 ) : (
                                     <>
                                         <ClearAllIcon className="text-lg sm:text-xl" />
-                                        <span className="hidden sm:inline">Tout supprimer</span>
+                                        
                                     </>
                                 )}
                             </button>
@@ -632,7 +632,7 @@ const regenererFichier = async (achatId) => {
                                                                         {item.product.name}
                                                                     </p>
                                                                     <p className="text-xs sm:text-sm text-gray-400">
-                                                                        Prix unitaire: {item.product.price} DA
+                                                                        Prix unitaire: {item.price_snapshot} DA
                                                                     </p>
                                                                 </div>
                                                                 <div className="text-left sm:text-right w-full sm:w-auto">

@@ -1,6 +1,6 @@
 from rest_framework import viewsets
 from .models import Product, Order, OrderItem,Achat,AchatItem
-from .serializers import ProductSerializer, OrderSerializer, OrderItemSerializer ,AchatSerializer,AchatItemSerializer
+from .serializers import ProductSerializer, OrderSerializer, OrderItemSerializer ,AchatSerializer,AchatItemSerializer, ReferenceSerializer
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
@@ -8,7 +8,7 @@ from rest_framework.decorators import api_view
 import socket
 
 from rest_framework import viewsets, filters
-from .models import Product
+from .models import Product, Reference
 from .serializers import ProductSerializer
 
 from django.shortcuts import render
@@ -22,7 +22,7 @@ class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
     filter_backends = [filters.SearchFilter]  # Pas DjangoFilterBackend
-    search_fields = ['reference', 'name']
+    search_fields = ['name', 'references__code']
     
     def get_queryset(self):
         queryset = Product.objects.all()
@@ -31,11 +31,56 @@ class ProductViewSet(viewsets.ModelViewSet):
 
         if name:
             queryset = queryset.filter(name__icontains=name)
+
         if reference:
-            queryset = queryset.filter(reference__icontains=reference)
-            
-        return queryset
+            queryset = queryset.filter(references__code__icontains=reference)
+
+        return queryset.distinct()
     
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+from .models import Product
+
+@api_view(['PATCH'])
+def update_product_prices(request, product_id):
+    """
+    Met à jour uniquement price et price_v du produit.
+    Les OrderItems et AchatItems existants stockent leur propre total
+    via total_price() calculé à la volée — les anciens enregistrements
+    utilisent toujours la snapshot du moment (quantity × prix actuel).
+    ATTENTION : si vos serializers renvoient le prix du produit en live,
+    les anciennes lignes afficheront le nouveau prix.
+    Pour une isolation totale, stocker price_snapshot sur chaque item.
+    """
+    try:
+        product = Product.objects.get(id=product_id)
+    except Product.DoesNotExist:
+        return Response({"error": "Produit introuvable"}, status=status.HTTP_404_NOT_FOUND)
+
+    price = request.data.get('price')
+    price_v = request.data.get('price_v')
+
+    if price is not None:
+        try:
+            product.price = Decimal(str(price))
+        except Exception:
+            return Response({"error": "Prix d'achat invalide"}, status=status.HTTP_400_BAD_REQUEST)
+
+    if price_v is not None:
+        try:
+            product.price_v = Decimal(str(price_v))
+        except Exception:
+            return Response({"error": "Prix de vente invalide"}, status=status.HTTP_400_BAD_REQUEST)
+
+    product.save()
+    return Response({"message": "Prix mis à jour avec succès", "price": str(product.price), "price_v": str(product.price_v)})
+
+class ReferenceViewSet(viewsets.ModelViewSet):
+    queryset = Reference.objects.all()
+    serializer_class = ReferenceSerializer
+
+
 class ProductZeroStockViewSet(viewsets.ModelViewSet):
     serializer_class = ProductSerializer
     filter_backends = [filters.SearchFilter]
@@ -45,16 +90,16 @@ class ProductZeroStockViewSet(viewsets.ModelViewSet):
         queryset = Product.objects.filter(stock=0)
 
         # Recherche personnalisée
-        name = self.request.query_params.get('name')
-        reference = self.request.query_params.get('reference')
+        name = self.request.query_params.get('name', None)
+        reference = self.request.query_params.get('reference', None)
 
         if name:
             queryset = queryset.filter(name__icontains=name)
 
         if reference:
-            queryset = queryset.filter(reference__icontains=reference)
+            queryset = queryset.filter(references__code__icontains=reference)
 
-        return queryset
+        return queryset.distinct()
 
 @api_view(['GET'])
 def get_dashboard_stats(request):
@@ -70,7 +115,7 @@ def get_dashboard_stats(request):
             {
                 "id": p.id,
                 "name": p.name,
-                "reference": p.reference,
+                "reference": [ref.code for ref in p.references.all()]  ,
                 "stock": float(p.stock)
             }
             for p in zero_stock_products
@@ -302,7 +347,13 @@ class OrderViewSet(viewsets.ModelViewSet):
                     product.stock = Decimal('0')
                 product.save()
 
-                OrderItem.objects.create(order=order, product=product, quantity=quantity)
+                OrderItem.objects.create(
+    order=order,
+    product=product,
+    quantity=quantity,
+    price_snapshot=product.price,       # ✅
+    price_v_snapshot=product.price_v,   # ✅
+)
 
                 return Response({
                     "message": "Produit ajouté à la commande"
@@ -520,11 +571,6 @@ class AchatViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def add_product(self, request, pk=None):
-        """
-        Ajouter un produit à un achat ou mettre à jour sa quantité.
-        POST /achats/<id>/add_product/
-        body: { "product_id": 1, "quantity": 2.5 }
-        """
         achat = self.get_object()
         product_id = request.data.get("product_id")
 
@@ -546,30 +592,29 @@ class AchatViewSet(viewsets.ModelViewSet):
 
             if existing_item:
                 quantity_diff = quantity - existing_item.quantity
-
-                # Augmenter le stock selon la différence
                 product.stock += quantity_diff
                 if product.stock < 0:
                     product.stock = Decimal('0')
                 product.save()
 
                 existing_item.quantity = quantity
+                # ✅ On ne touche PAS au price_snapshot — le prix au moment initial est conservé
                 existing_item.save()
 
-                return Response({
-                    "message": "Quantité du produit mise à jour dans l'achat"
-                }, status=status.HTTP_200_OK)
+                return Response({"message": "Quantité du produit mise à jour dans l'achat"}, status=status.HTTP_200_OK)
 
             else:
-                # Augmenter le stock
                 product.stock += quantity
                 product.save()
 
-                AchatItem.objects.create(achat=achat, product=product, quantity=quantity)
+                AchatItem.objects.create(
+                    achat=achat,
+                    product=product,
+                    quantity=quantity,
+                    price_snapshot=product.price,  # ✅ Geler le prix actuel
+                )
 
-                return Response({
-                    "message": "Produit ajouté à l'achat"
-                }, status=status.HTTP_201_CREATED)
+                return Response({"message": "Produit ajouté à l'achat"}, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['delete'])
     def remove_product(self, request, pk=None):
@@ -653,7 +698,7 @@ class ValiderAchatView(APIView):
                 achat_items = AchatItem.objects.filter(achat=achat)
                 for item in achat_items:
                     product = item.product
-                    line = f"{product.reference}${product.name}${item.quantity}${product.price}${product.price_v}${item.total_price()}${achat.total_price}#\n"
+                    line = f"{product.reference}${item.quantity}${product.price}#\n"
                     file.write(line)
 
         except Exception as e:
@@ -689,7 +734,7 @@ class RegenererFichierAchatView(APIView):
                 achat_items = AchatItem.objects.filter(achat=achat)
                 for item in achat_items:
                     product = item.product
-                    line = f"{product.reference}${product.name}${item.quantity}${product.price}${product.price_v}${item.total_price()}${achat.total_price}#\n"
+                    line = f"{product.reference}${item.quantity}${product.price}#\n"
                     file.write(line)
 
         except Exception as e:

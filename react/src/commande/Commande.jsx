@@ -424,7 +424,7 @@ const regenererFichier = async (commandeId) => {
                                                                         {item.product.name}
                                                                     </p>
                                                                     <p className="text-sm text-gray-400">
-                                                                        Prix unitaire: {item.product.price_v} DA
+                                                                        Prix unitaire: {item.price_v_snapshot} DA
                                                                     </p>
                                                                 </div>
                                                                 <div className="text-right">

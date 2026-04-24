@@ -256,11 +256,13 @@ export default function Dashboard({ totalOrders, totalPurchases, zeroStockCount 
                                             }
                                         </h3>
                                         <p className="text-gray-300 text-xs sm:text-sm mb-1 break-words">
-                                            Référence : {searchField === 'reference'
-                                                ? highlightText(product.reference, searchTerm)
-                                                : product.reference
-                                            }
+                                            Référence : {product.references.map(ref => (
+        <span key={ref.id} className="mr-2">
+            {highlightText(ref.code, searchTerm)}
+        </span>
+    ))}
                                         </p>
+           
                                         <p className="text-red-400 text-xs sm:text-sm font-semibold">
                                             Stock : {product.stock}
                                         </p>

@@ -31,7 +31,7 @@ export default function Add_commande() {
 
 const [scannerOpen, setScannerOpen] = useState(false);
 
-    const videoRef = useRef(null);
+       const videoRef = useRef(null);
     const codeReaderRef = useRef(null);
     // Chaque session de scan a un ID unique.
     // Quand stopScanner est appelé, on incrémente ce compteur.
@@ -121,7 +121,6 @@ const [scannerOpen, setScannerOpen] = useState(false);
             }
         }
     };
-
 
     // Fonction pour récupérer les produits
     const fetchProducts = async (url, isLoadMore = false) => {

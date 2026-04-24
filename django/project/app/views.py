@@ -1,3 +1,6 @@
+from httpx import codes
+from sympy import product
+
 from rest_framework import viewsets
 from .models import Product, Order, OrderItem,Achat,AchatItem
 from .serializers import ProductSerializer, OrderSerializer, OrderItemSerializer ,AchatSerializer,AchatItemSerializer, ReferenceSerializer
@@ -144,6 +147,13 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 import socket
 
+from decimal import Decimal
+import socket
+from django.db import transaction
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+
 @api_view(['GET'])
 def refresh_products(request):
     try:
@@ -168,14 +178,17 @@ def refresh_products(request):
             response_str = b''.join(chunks).decode('utf-8', errors='replace')
 
         lines = response_str.strip().split('\r\n')
-        products_data = []
+
+        products_to_create = []
+        references_to_create = []
 
         for line in lines:
             fields = line.strip('$').split('$')
+
             if len(fields) >= 5:
-                code, description, qty, prix_achat, prix_vente = fields[:5]
+                codes, description, qty, prix_achat, prix_vente = fields[:5]
+
                 try:
-                    # Convertir en Decimal et forcer à 0 si négatif
                     stock = Decimal(qty.strip() or '0')
                     if stock < 0:
                         stock = Decimal('0')
@@ -183,30 +196,50 @@ def refresh_products(request):
                     price = Decimal(prix_achat.strip() or '0')
                     price_v = Decimal(prix_vente.strip() or '0')
 
-                    products_data.append(Product(
-                        reference=code.strip(),
+                    # ✅ Créer le produit
+                    product = Product(
                         name=description.strip().replace('*', ''),
                         stock=stock,
                         price=price,
                         price_v=price_v
-                    ))
+                    )
+                    products_to_create.append(product)
+
+                    # ⚠️ on stock les codes temporairement
+                    product._codes = [c.strip() for c in codes.split(',') if c.strip()]
 
                 except Exception as parse_err:
                     print(f"Erreur parsing produit : {parse_err}")
                     continue
 
         with transaction.atomic():
-            Product.objects.all().delete()  # 🔥 Suppression complète
-            Product.objects.bulk_create(products_data)  # 💾 Insertion rapide en masse
+            # 🔥 reset
+            Reference.objects.all().delete()
+            Product.objects.all().delete()
+
+            # 💾 insert produits
+            created_products = Product.objects.bulk_create(products_to_create)
+
+            # 💾 créer les références
+            for product, created_product in zip(products_to_create, created_products):
+                for code in product._codes:
+                    references_to_create.append(
+                        Reference(
+                            product=created_product,
+                            code=code
+                        )
+                    )
+
+            Reference.objects.bulk_create(references_to_create)
 
         return Response({
-            'message': 'Produits réinitialisés avec succès',
-            'nombre_produits': len(products_data)
+            'message': 'Produits et références importés avec succès',
+            'nombre_produits': len(created_products),
+            'nombre_references': len(references_to_create)
         }, status=status.HTTP_200_OK)
 
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -466,40 +499,6 @@ from rest_framework import status
 from .models import Order, OrderItem
 
 
-class ValiderCommandeView(APIView):
-    def post(self, request, commande_id):
-        commande = get_object_or_404(Order, id=commande_id)
-
-        if commande.status == 'Validé':
-            return Response({'detail': 'Déjà validée.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        commande.status = 'Validé'
-        commande.save()
-
-        # Créer le dossier s'il n'existe pas
-        folder_path = r"C:\gesta-commandes-files"
-        os.makedirs(folder_path, exist_ok=True)
-
-        # Nettoyer le nom du client pour le nom de fichier
-        safe_filename = re.sub(r'[\\/*?:"<>|]', "_", f"{commande.customer_name}-{commande.id}")
-        file_path = os.path.join(folder_path, f"{safe_filename}.txt")
-
-        try:
-            with open(file_path, "w", encoding="utf-8") as file:
-                # Écrire le nom de la commande/client
-                file.write(f"{commande.customer_name}\n")
-
-                # Écrire chaque produit de la commande
-                order_items = OrderItem.objects.filter(order=commande)
-                for item in order_items:
-                    product = item.product
-                    line = f"{product.reference}${product.name}${item.quantity}${product.price}${product.price_v}${item.total_price()}${commande.total_price}#\n"
-                    file.write(line)
-
-        except Exception as e:
-            return Response({'detail': f"Erreur lors de la génération du fichier : {str(e)}"}, status=500)
-
-        return Response({'detail': 'Commande validée avec succès.'}, status=status.HTTP_200_OK)
 
 
 class AchatViewSet(viewsets.ModelViewSet):
@@ -671,6 +670,43 @@ class AchatViewSet(viewsets.ModelViewSet):
         }, status=status.HTTP_200_OK)
 
 
+class ValiderCommandeView(APIView):
+    def post(self, request, commande_id):
+        commande = get_object_or_404(Order, id=commande_id)
+
+        if commande.status == 'Validé':
+            return Response({'detail': 'Déjà validée.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        commande.status = 'Validé'
+        commande.save()
+
+        # Créer le dossier s'il n'existe pas
+        folder_path = r"C:\gesta-commandes-files"
+        os.makedirs(folder_path, exist_ok=True)
+
+        # Nettoyer le nom du client pour le nom de fichier
+        safe_filename = re.sub(r'[\\/*?:"<>|]', "_", f"{commande.customer_name}-{commande.id}")
+        file_path = os.path.join(folder_path, f"{safe_filename}.txt")
+
+        try:
+            with open(file_path, "w", encoding="utf-8") as file:
+                # Écrire le nom de la commande/client
+                file.write(f"{commande.customer_name}\n")
+
+                # Écrire chaque produit de la commande
+                order_items = OrderItem.objects.filter(order=commande)
+                for item in order_items:
+                    product = item.product
+                    codes = ",".join(product.references.values_list('code', flat=True))
+
+                    line = f"{codes}${product.name}${item.quantity}${product.price}${product.price_v}${item.total_price()}${commande.total_price}#\n"
+                    file.write(line)
+
+        except Exception as e:
+            return Response({'detail': f"Erreur lors de la génération du fichier : {str(e)}"}, status=500)
+
+        return Response({'detail': 'Commande validée avec succès.'}, status=status.HTTP_200_OK)
+
 class ValiderAchatView(APIView):
     def post(self, request, achat_id):
         achat = get_object_or_404(Achat, id=achat_id)
@@ -698,7 +734,9 @@ class ValiderAchatView(APIView):
                 achat_items = AchatItem.objects.filter(achat=achat)
                 for item in achat_items:
                     product = item.product
-                    line = f"{product.reference}${item.quantity}${product.price}#\n"
+                    codes = ",".join(product.references.values_list('code', flat=True))
+
+                    line = f"{codes}${item.quantity}${product.price}#\n"
                     file.write(line)
 
         except Exception as e:
@@ -734,7 +772,9 @@ class RegenererFichierAchatView(APIView):
                 achat_items = AchatItem.objects.filter(achat=achat)
                 for item in achat_items:
                     product = item.product
-                    line = f"{product.reference}${item.quantity}${product.price}#\n"
+                    codes = ",".join(product.references.values_list('code', flat=True))
+
+                    line = f"{codes}${item.quantity}${product.price}#\n"
                     file.write(line)
 
         except Exception as e:
@@ -772,7 +812,9 @@ class RegenererFichierCommandeView(APIView):
                 commande_items = OrderItem.objects.filter(order=commande)
                 for item in commande_items:
                     product = item.product
-                    line = f"{product.reference}${product.name}${item.quantity}${product.price}${product.price_v}${item.total_price()}${commande.total_price}#\n"
+                    codes = ",".join(product.references.values_list('code', flat=True))
+
+                    line = f"{codes}${product.name}${item.quantity}${product.price}${product.price_v}${item.total_price()}${commande.total_price}#\n"
                     file.write(line)
 
         except Exception as e:

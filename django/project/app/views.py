@@ -222,11 +222,11 @@ def refresh_products(request):
                 product.save()  # ✅ PK garanti peu importe SQLite ou Django
                 for code in codes:
                     references_to_create.append(Reference(product=product, code=code))
-            Reference.objects.bulk_create(references_to_create)
+            Reference.objects.bulk_create(references_to_create, ignore_conflicts=True)
 
         return Response({
             'message': 'Produits et références importés avec succès',
-            'nombre_produits': len(created_products),
+            'nombre_produits': len(products_to_create),
             'nombre_references': len(references_to_create)
         }, status=status.HTTP_200_OK)
 

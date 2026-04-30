@@ -697,9 +697,9 @@ class ValiderCommandeView(APIView):
                 order_items = OrderItem.objects.filter(order=commande)
                 for item in order_items:
                     product = item.product
-                    codes = ",".join(product.references.values_list('code', flat=True))
+                    code = product.references.values_list('code', flat=True).first() or ""
 
-                    line = f"{codes}${product.name}${item.quantity}${product.price}${product.price_v}${item.total_price()}${commande.total_price}#\n"
+                    line = f"{code}${product.name}${item.quantity}${product.price}${product.price_v}#\n"
                     file.write(line)
 
         except Exception as e:
@@ -734,9 +734,9 @@ class ValiderAchatView(APIView):
                 achat_items = AchatItem.objects.filter(achat=achat)
                 for item in achat_items:
                     product = item.product
-                    codes = ",".join(product.references.values_list('code', flat=True))
+                    code = product.references.values_list('code', flat=True).first() or ""
 
-                    line = f"{codes}${item.quantity}${product.price}#\n"
+                    line = f"{code}${product.name}${item.quantity}${product.price}${product.price_v}#\n"
                     file.write(line)
 
         except Exception as e:
@@ -772,9 +772,9 @@ class RegenererFichierAchatView(APIView):
                 achat_items = AchatItem.objects.filter(achat=achat)
                 for item in achat_items:
                     product = item.product
-                    codes = ",".join(product.references.values_list('code', flat=True))
+                    code = product.references.values_list('code', flat=True).first() or ""
 
-                    line = f"{codes}${item.quantity}${product.price}#\n"
+                    line = f"{code}${product.name}${item.quantity}${product.price}${product.price_v}#\n"
                     file.write(line)
 
         except Exception as e:
@@ -812,9 +812,9 @@ class RegenererFichierCommandeView(APIView):
                 commande_items = OrderItem.objects.filter(order=commande)
                 for item in commande_items:
                     product = item.product
-                    codes = ",".join(product.references.values_list('code', flat=True))
+                    code = product.references.values_list('code', flat=True).first() or ""
 
-                    line = f"{codes}${product.name}${item.quantity}${product.price}${product.price_v}${item.total_price()}${commande.total_price}#\n"
+                    line = f"{code}${product.name}${item.quantity}${product.price}${product.price_v}#\n"
                     file.write(line)
 
         except Exception as e:

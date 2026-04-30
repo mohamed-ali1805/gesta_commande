@@ -1,6 +1,8 @@
 
 
 
+
+
 from rest_framework import viewsets
 from .models import Product, Order, OrderItem,Achat,AchatItem
 from .serializers import ProductSerializer, OrderSerializer, OrderItemSerializer ,AchatSerializer,AchatItemSerializer, ReferenceSerializer
@@ -213,28 +215,20 @@ def refresh_products(request):
                     continue
 
         with transaction.atomic():
-            # 🔥 reset
             Reference.objects.all().delete()
             Product.objects.all().delete()
-
-            # 💾 insert produits
-            created_products = Product.objects.bulk_create(products_to_create)
-
-            # 💾 créer les références
-            for product, created_product in zip(products_to_create, created_products):
-                for code in product._codes:
-                    references_to_create.append(
-                        Reference(
-                            product=created_product,
-                            code=code
-                        )
-                    )
-
-            Reference.objects.bulk_create(references_to_create)
+            references_to_create = []
+            for product in products_to_create:
+                codes = product._codes
+                del product._codes
+                product.save()  # ✅ PK garanti peu importe SQLite ou Django
+                for code in codes:
+                    references_to_create.append(Reference(product=product, code=code))
+            Reference.objects.bulk_create(references_to_create, ignore_conflicts=True)
 
         return Response({
             'message': 'Produits et références importés avec succès',
-            'nombre_produits': len(created_products),
+            'nombre_produits': len(products_to_create),
             'nombre_references': len(references_to_create)
         }, status=status.HTTP_200_OK)
 

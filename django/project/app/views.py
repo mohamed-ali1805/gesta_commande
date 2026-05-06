@@ -24,13 +24,13 @@ def index(request):
 from rest_framework import viewsets, filters
 
 class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.all()
+    queryset = Product.objects.all().order_by('name')  # ou 'id', ou '-stock'
     serializer_class = ProductSerializer
-    filter_backends = [filters.SearchFilter]  # Pas DjangoFilterBackend
+    filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'references__code']
     
     def get_queryset(self):
-        queryset = Product.objects.all()
+        queryset = Product.objects.all().order_by('name')
         name = self.request.query_params.get('name', None)
         reference = self.request.query_params.get('reference', None)
 
